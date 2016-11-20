@@ -1,0 +1,69 @@
+Essential ngMock functions
+--------------------------------
+
+How do we get instances of our Angular components in our unit tests?
+
+- angular.mock.module: Use to load our modules. Accepts arguments in 3 ways:
+
+1) A string alias (i.e. name of the module)
+2) anonymous function argument (can inject other dependencies)
+3) anonymous object literal argument (cannot inject other dependencies)
+
+angular.mock.module('omdbApi');
+
+angular.mock.module(function($provide, $http) {
+    $provide.factory('omdbApi', function() {
+        return {
+            search: function(query) {
+                return movieData;
+            }
+        }
+    })
+}
+
+angular.mock.module({
+    'omdbApi' : {
+`````` return {
+            search: function(query) {
+                return movieData;
+            }
+    ```}
+    });
+
+- inject: Used to get instances of components from modules. Wrapper on the AngularJS
+injector responsible for DI.
+
+
+Because they are so common, angular-mock makes both available on the
+global window object (so we don't have to type angular.mock.module, just module)
+
+
+- dump function to serialise common objects ($scope, DOM elements) for debugging data in a 
+nice format (much better than console.log)
+
+
+$httpBackend: Fake HTTP backend implementation suitable for unit testing applications that use 
+the $http service.
+
+- when: Specified a backend definition. Black-box testing, use with any data, reuse allowed, order
+does not matter.
+- expect: Specified a backend expectation. Strict usage testing, best for testing exact usage,
+order matters, re-use not allowed.
+
+
+$http talks to $httpBackendProvider (here is where we replace this with the mock).
+
+
+$controller: A decorator for $controller with an additional bindings parametr
+
+$controller(constructor, locals, [bindings])
+
+$controller('GreetingsController, {$scope: myScope}, [bindings])
+
+OR 
+
+$controller(getInstance(), locals, [bindings]);
+
+locals: Objects that maps from key names to objects accepted
+
+bindings: Optional object whose values will be matched
