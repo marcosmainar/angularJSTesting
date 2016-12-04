@@ -1,0 +1,53 @@
+// index
+<script type="text/javascript" src="https://code.angularjs.org/1.4.4/angular-mocks.js"></script>
+
+'ngMockE2E'
+
+  .run(function ($httpBackend) {    
+      var data = ['tt0076759', 'tt0080684', 'tt0086190'];
+      var headers = {
+        headers: {'Content-Type': 'application/json'}
+      };
+
+      // return the Popular Movie Ids
+      $httpBackend.whenGET(function(s) {
+        return (s.indexOf('popular') !== -1);
+      }).respond(200, data, headers);
+
+      // allow all other requests to run
+      $httpBackend.whenGET(/.*/).passThrough();
+  });
+
+
+	  	PopularMovies.query(function(data) {
+  			results = data;
+  			findMovie(results[0]);
+  			$interval(function() {
+  				++idx;
+  				findMovie(results[idx % results.length]);
+  			}, 5000);
+	  	});
+
+
+
+
+		spyOn(PopularMovies, 'query').and.callFake(function(cb) {
+			cb(['tt0076759', 'tt0080684', 'tt0086190']);
+		});
+
+		spyOn(PopularMovies, 'query').and.callFake(function(cb) {
+			cb(['tt0076759', 'tt0080684', 'tt0086190', 'ttError']);
+		});
+
+
+
+// filter
+
+        if (!value) {
+            $log.warn('date value cannot be undefined');
+            return;
+        }
+
+ _$log_
+ $log = _$log_;
+expect($log.warn.logs[0]).toEqual(['date value cannot be undefined']);

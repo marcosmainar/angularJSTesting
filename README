@@ -2,6 +2,7 @@ Essential ngMock functions
 --------------------------------
 
 How do we get instances of our Angular components in our unit tests?
+-----------------------------------------------------------------------
 
 - angular.mock.module: Use to load our modules. Accepts arguments in 3 ways:
 
@@ -54,7 +55,7 @@ order matters, re-use not allowed.
 $http talks to $httpBackendProvider (here is where we replace this with the mock).
 
 
-$controller: A decorator for $controller with an additional bindings parametr
+$controller: A decorator for $controller with an additional bindings parameter
 
 $controller(constructor, locals, [bindings])
 
@@ -62,8 +63,391 @@ $controller('GreetingsController, {$scope: myScope}, [bindings])
 
 OR 
 
+function as the first argument
+
 $controller(getInstance(), locals, [bindings]);
 
-locals: Objects that maps from key names to objects accepted
+locals: Objects that maps from key names to objects accepted. E.g. $scope object, other
+controller args
 
-bindings: Optional object whose values will be matched
+bindings: Optional object whose values will be matched. Object for controllerAs this binding.
+
+
+- How do we use $timeout and $interval Angular services in unit tests?
+
+$timeout is Angular's wrapper for the window.setTimeout function
+
+$timeout(function(){}, delay, bool whether to do dirty check or not to update UI elements if timeout changes UI
+elements, [pass]);
+$timeout is async and delays will make execution slow => Hard to test
+
+ngMock's wrapper for $timeout
+var timeout = $timeout([fn], [delay],[invokeAppy],[pass])
+$timeout.flush([delayInMs]); => Complete all of the timeouts
+$timeout.verifyNoPendintTasks(); => Will throw if any outstanding timeouts not flushed
+
+
+$timeout.cancel(timeout);
+
+$interval: Angular's wrapper for the window.setInterval function
+
+$interval(function() {}, 100, [count], [invokeApply], [pass]):
+
+- count: how many times to repeat the interval, 0 or no value makes it indefinite
+- invokeApply: Default value is true. If set to false, any changes to scope, won't be
+- pass: Allows us to pass arguments for the function to be executed
+
+$interval.cancel(interval);
+
+- How do we advance in time?
+
+- ngMock's implementation of the $interval service. Complete mock implementation
+
+$interval.flush([millis]); => Executes any interval tasks on the test.
+
+
+
+- How do we test an Angular directive? When do we use $rootScope service in UT?
+-------------------------------------------------------------------------------
+
+$compile: Compiles an HTML string or DOM into a template and produces a template function which can 
+then be used to link $scope and the template together.
+
+$rootScope: Angular service that represents the root scope of an application.  
+Every application has a single root scope. All child scopes inherit (descend) from this.
+
+var childScope = $rootScope.$new(); 
+$rootScope.$apply() : Used to resolve promises
+$rootScope.$digest();
+$rootScope.$countChildScopes(); => 
+$rootScope.$countWatchers(); => counts all the watchers (watches properties on an Angular scope
+to detect changes from the user, e.g. on an input) of direct and indirect watch scopes
+
+$rootScope in ngMock: Scope type decorated with useful methods for unit testing
+
+
+- Unit testing dates in Javascript
+----------------------------------
+
+ngMock's TzDate type: Wrapper of native Date function. Can set up a timezone that will not 
+change according to the local machine settings.
+
+angular.mock.TzDate(offset, Date)
+
+
+
+- Time Measure in Milliseconds since 1st January 1970 => new Date(0)
+- Construct new dates via string representation (with or without time information):
+YYYY-MM-DDTHH:mm:ss.sssZ
+YYYY-MM-DDTHH:mm:ss+HH:mm
+- New Dates have a base value in UTC
+- A Date object instance has two states: UTC time and local time based on system
+- Date constructor accepts positive or negative offsets
+
+- Local Date/Time vs UTC Date/Time can cause problems in tests!
+
+- For Unit tests, we should be testing that we are using Date type correctly, as opposed to its
+functionality. Use Jasmine to spy on methods of interest.
+
+How to unit test an Angular $filter (like pipe in Angular 2)
+--------------------------------------------------------
+
+e.g. date | fromNow
+
+var myFilter = _$filter_('fromNow');
+
+Unit testing with exceptions
+----------------------
+
+$exceptionHandler: Any uncaught exception in angular expressions is deleted to this service.
+Default implementation just delegates to the log services.
+
+Mock implementation of $exceptionHandler that rethrows or logs errors passed to it.
+
+$exceptionHandlerProvider: Handles Modes:
+
+1) Log: Catches the error and stores it in an rray
+2) Rethrow: Rethrow the error in a standard exception
+
+
+beforeEach(module($exceptionHandlerProvider) {
+    //$exceptionHandlerProvider.mode('rethrow'); // Default behaviour in tests
+    $exceptionHandlerProvider.mode('log');
+})
+
+.catch(function(e) {
+    $exceptionHandler(e);
+});
+
+except($exceptionHandler.errors).toEqual(['Something went wrong']);
+
+
+It's better practice in Angular not to throw native exceptions, except to use the $exceptionHandler
+service so that we can simplify test ccode, change the handler everywhere by changing service impl.
+
+
+Unit Testing with Logging
+--------------------------
+$log service: Simple service for logging. Default impl safely writs the message into the browser console.
+
+Mock implementation gathers all logged messages into an array (one araray per logging level).
+
+.config(function($logProvider)  {
+    $logProvider.debugEnabled(true);
+})
+
+beforeEach(module($logProvider) {
+ $logProvider.debugEnabled(true);
+});
+
+$logProvider.debugEnabled(false);
+$log.log  
+    .info
+    .warn
+    .error
+    .debug
+
+Test methods:
+
+$log.reset() : Clears log array
+$log.assertEmpty();
+
+expect($log.debug.logs[0]).toEqual('bla');
+
+
+Testing with ngMockE2E backend
+---------------------------------
+- Mock calls to a server (stub out the server-side call of an application).
+- ngMockE2E: An angular module which contains mocks suitable for E2E testing. Currently there is only
+one mock present in this module, the e2e $httpBackend mock.
+
+- Setup a fake $httpBackend service: 
+
+Similar to the $httpBackend service from ngMock. Allows us to returned canned answers to http calls in our code under
+test. Not possible to make real HTTP calls.
+
+ngMockE2E $httpBackend service allows us to make real HTTP calls. Can mix real and fake http responses.
+Key difference with ngMock's is that is able to make real http calls via passThrough.
+Possible to setup when configuration in the same way. Call to flush() not required to complete requests. Not available
+in unit tests to make real HTTP calls in UT. Both services are not in the same module but conceptually 
+
+$httpBackend
+    .when('GET', 'url', [headers])
+    .respond(200, data, headers) // OR passThrough() to make a real HTTP request
+
+$httpBackend
+    .whenGET(funcdtion(url) {
+    })
+
+$httpBackend.whenGET(/.*/).passThrough();
+
+Would be great if we could use this module on our Unit Tests (there is an open issue request)
+
+
+AngularJS is an MVC Web Framework
+---------------------------------
+
+ng-app: Don't specify it on the <head> element
+
+The View is your HTML.
+
+1 view, 1 controller per page.
+
+$scope: Plain JS object that has some event handlers baked into it. From the $rootScope,
+all the way down. $rootScope can be used as an event bus when communicating between controllers.
+Inject into your service and inform other controllers of events that happen in the app.
+It's used to set up the two-way data binding between the view and the model.
+
+
+ng-model: world, where world is a variable on $scope.world on the controller
+
+
+The majority of the work with AngularJS will fall within a core set of AngularJS components.
+20% of stuff will give you 80%.
+
+Module -> Config -> Routes (join View and Controller).
+
+1st top level app module. ng-app="moduleName"
+
+(augment your controllers) Service - Controller - $scope - View - Directive (augment your view)
+
+$compile: Compiles DOM into a template function that can then be used to link scope and the View together.
+
+$injector: Configures service that it needs.
+
+$digest, $apply:
+
+$digest processes all of the watchers of the current scope.
+$apply() is used to notify that something has happened outside of the AngularJS domain. Forces a $digest cycle.
+Does dirty checking.
+In Angular you can bind not only to values but also to methods (i.e. to their result)
+
+Model View Whatever
+
+- MVVM: View bounds to your scope. The view can call commands on the ViewModel.
+Model as in Domain Model, the data of the app.
+- Commands, Data Bindings, Change notification
+
+Controller and $scope:
+
+$scope is the glue between the Controller and the View. The Controller (properties and methods) is responsible for constructing the model on $scope
+and providing commands for the View to act upon $scope. $scope also provides context.
+
+Controller: Imperative Behaviour
+$scope the glue (a simple JS object)
+View (DOM): Declarative, markup
+
+Best practices - Controllers should: 
+
+- not know anything about the view they control. They are simple data structures with methods and properties.
+- be small and focused (makes them easier to test). Only focus on their view
+- not talk to other controllers. If you need to share information between controllers, you use a service, pulling that higher level shared logic.
+- not own the domain model.
+
+View and Templates:
+
+- The view is just AngularJS compiled DOM.
+- The view is the product of $compile merging the HTMl template with $scope
+- DOM no longer single source of truth
+
+Template compiles into view
+
+Digest Cycle
+Changes to model update view
+Changes to view update model
+
+Models, services and routes
+
+Services: 
+- Carry out common tasks specific to the web app.
+- Services are consumed via the AngularJS DI subsystem.
+- Are application singletons. One service per injector and you can have more than one injector per app. $injector.get("myService"). Checks instance cache to return existing
+or create a new one with an instance factory.
+- Are instantiated lazily.
+- Use services if you want to do this.whatever. Call them using constructor function.
+- Factory you just return a set of methods in a data structure.
+
+Routes:
+- $route is used for deep linking URLs to Controllers and View.
+- Define routes using $routeProvider. On the config phase of a module
+- Typically used in conjunction with ngView directive and $routeParams service.
+- ngRoute 1-1 relationship controller and view. Could also use UI router.
+
+
+
+
+
+AngularJS Directive Basics
+--------------------------
+
+- Directives as a DSL to extend HTML
+- Most simple directives consist of 3 things (or less):
+
+- Directive Definition Object (DDO): Tells the compiler how the directive is supposed to be assembled.
+Common properties are the link function (to get hold of element), controller function, restrict (A - Attribute, C - Class, E- Element),
+template and templateUrl.
+- Controller: 
+- Link function
+
+- Directives are declared camelCase but defined in HTML with snake-case
+
+- The controller is constructed during the pre-linking phase
+- Receives $scope which is the current scope for the element.
+
+- The link function is where DOM manipulation happens. The link function comes with scope, elements and attrs.
+- scope is the same $scope in the controller function.
+- element is a jQuery lite instance of the DOM element the directive is declared on.
+- attrs is an array of attributes of the element where the directive is declared on.
+
+- You can define your compile function in the directive (pre and post-link steps)
+
+$window service is just a wrapper on document.window
+
+- ngInfite scroll for very large datasets
+
+- Bind to the simplest object that you can since the digest cycle will do deep object comparison which can get very expensive on large sets of complex deep/nested objects.
+Make your objects as shallow as possible, create a simplified version of your object.
+
+
+Services
+---------
+- $http service is a core Angular service that facilitates comms with HTTP servers via the browser's XMLHttpRequest object or via JSONP.
+- API based on the deferred/promise APIs exposed by the $q service.
+- The returned value of calling $http is a promise.
+- You can use the then method to register callbacks.
+- These callbacks receive a single argument - an object representing the response of your service call.
+
+- Real time communication with Firebase: angular fire
+
+
+$rootscope as an event bus
+
+- call an event from the controller on a service and the
+service will broadcast the event. Everything
+else will listen for that event
+
+- when event happens
+$scope.on('eevntName', function
+
+- can broadcast event down
+- can emit event which goes up to a parent
+scope
+
+
+Unit testing in AngularJS
+--------------------------
+
+- beforEach(inject(function($controller, $rootScope) {
+    scope = $rootScope.$new();
+    ctrl = $controller('MainCtrl', { $scope: scope, UserService: mockUserService });
+
+- ngModel impliticitly creates $valid property on the form, e.g. $scope.loginForm.$valid
+
+
+Advanced directives
+--------------------
+
+Isolated scope: 
+
+- Does not prototypically inherit from its parent.
+- Prevents your directive from accidentally modifying data in the parent scope.
+- This in a sense defines the API for the directive.
+
+Attribute isolated scope:
+- Defined with an @ symbol.
+- Binds a local scope property to the value of the DOM attribute.
+- The binding is uni-directional from parent to directive.
+- The result is always a string because DOM attributes are strings.
+- Useful to notify the directive of changes on the parent.
+
+Binding isolated scope:
+- Defined with an = symbol.
+- Bi-directional between parent and directive.
+- You can define the binding as optional via =?
+- Optimal for dealing with collections and objects
+
+Expression isolated scope:
+- Defined using an & symbol
+- Allows you to execute an expression on the parent scope. To get the parent to do something for the child.
+- To pass variables from child to parent expressions you must use an object map.
+
+
+Transclusion:
+
+- Compiles the content of the element and makes it available to the directive.
+- The transcluded contents are bound to the parent scope.
+- The directive contents are bound to an isolate scope.
+- The two scopes are siblings.
+- Good for decorating an existing element with a directive without destroying it.
+- E.g. tooltip
+
+
+
+Compile
+- Responsible for transforming the template DOM. If you need to do before your directive is available.
+
+
+- Inject service at the directive level, instead of inside the controller of the directive
+- Defer an operation in the directive to the model makes it easier to test.
+E.g. sort by using jQuery UI, grabbing scope of current and previous element, and calling method on model
+to reorder elements.

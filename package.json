@@ -19,7 +19,10 @@
     "@types/angular": "^1.5.20",
     "@types/angular-mocks": "^1.5.6",
     "angular": "^1.5.8",
+    "angular-bootstrap": "^0.12.2",
     "angular-mocks": "^1.5.8",
-    "angular-resource": "^1.5.8"
+    "angular-resource": "^1.5.8",
+    "angular-router": "0.0.2",
+    "express": "^4.14.0"
   }
 }
